@@ -1,0 +1,42 @@
+#!/usr/bin/python3
+
+import argparse
+import json
+import packet.api
+import packet.vm
+import paramiko.client
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--verbose', action='store_const', const=True)
+parser.add_argument('--hostName')
+parser.add_argument('--paramFile', help='text file containing docker run parameters (as a simple one-line string)')
+parser.add_argument('--param', help='docker run parameters')
+parser.add_argument('--cmd', help='docker run cmd override')
+parser.add_argument('apiToken')
+parser.add_argument('projectId')
+parser.add_argument('imageName')
+args = parser.parse_args()
+
+param = []
+if args.param is not None:
+    param.append(args.param)
+if args.paramFile is not None:
+    with open(args.paramFile) as f:
+       param.append(f.readline().strip('\n'))
+param = ' '.join(param)
+
+cmd = ''
+if args.cmd is not None:
+    cmd = args.cmd
+
+vmParam = packet.vm.Vm.paramTmpl
+if args.hostName is not None:
+    vmParam['hostname'] = args.hostName
+
+api = packet.api.Api(args.apiToken)
+vm = packet.vm.Vm(api)
+vm.create(args.projectId, vmParam)
+vm.installDocker(args.verbose)
+vm.runDockerContainer('informatykanastart/siomaster', param, cmd, args.verbose)
+
