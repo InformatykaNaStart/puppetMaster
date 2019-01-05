@@ -1,42 +1,61 @@
 #!/usr/bin/python3
 
 import argparse
+import getpass
 import json
+import logging
 import packet.api
 import packet.vm
-import paramiko.client
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--verbose', action='store_const', const=True)
 parser.add_argument('--hostName')
 parser.add_argument('--paramFile', help='text file containing docker run parameters (as a simple one-line string)')
-parser.add_argument('--param', help='docker run parameters')
+parser.add_argument('--paramStr', help='string containing all docker run parameters')
 parser.add_argument('--cmd', help='docker run cmd override')
-parser.add_argument('apiToken')
-parser.add_argument('projectId')
+parser.add_argument('-s', '--substitute', nargs=2, action='append', default=[], help='values for placeholders in docker run parameters ')
+parser.add_argument('--apiToken')
+parser.add_argument('--projectId')
 parser.add_argument('imageName')
 args = parser.parse_args()
 
+if args.hostName is not None and args.hostName == 'localhost':
+    raise Exception('Nothing will work with the --hostName set to "localhost". Please try something else.')
+
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO if args.verbose else logging.ERROR)
+
 param = []
-if args.param is not None:
-    param.append(args.param)
+if args.paramStr is not None:
+    param.append(args.paramStr)
 if args.paramFile is not None:
     with open(args.paramFile) as f:
        param.append(f.readline().strip('\n'))
 param = ' '.join(param)
 
+paramSubst = dict(zip([x[0] for x in args.substitute], [x[1] for x in args.substitute]))
+
 cmd = ''
 if args.cmd is not None:
     cmd = args.cmd
 
-vmParam = packet.vm.Vm.paramTmpl
-if args.hostName is not None:
-    vmParam['hostname'] = args.hostName
+if args.apiToken is None or args.projectId is None:
+    logging.info('--apiToken and/or --projectId not specified - running locally\n')
+    if args.hostName is None:
+        raise Exception('The --hostName parameter is required when running locally')
+    vm = packet.vm.Vm()
+    vm.ip = args.hostName
+    vm.username = getpass.getuser()
+else:
+    vmParam = packet.vm.Vm.paramTmpl
+    if args.hostName is not None:
+        vmParam['hostname'] = args.hostName
 
-api = packet.api.Api(args.apiToken)
-vm = packet.vm.Vm(api)
-vm.create(args.projectId, vmParam)
-vm.installDocker(args.verbose)
-vm.runDockerContainer('informatykanastart/siomaster', param, cmd, args.verbose)
+    api = packet.api.Api(args.apiToken)
+    vm = packet.vm.Vm(api)
+    vm.create(args.projectId, vmParam)
+    vm.installDocker()
+
+logging.info('The VM is ready (%s). Running the docker container\n' % vm.ip)
+vm.runDockerContainer(args.imageName, param, cmd, paramSubst)
 
