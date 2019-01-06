@@ -65,5 +65,11 @@ class Vm:
         stdin, stdout, stderr = client.exec_command(command)
         for i in stdout:
             logging.info(i.strip('\n'))
+        errors = False
+        for i in stderr:
+            errors = True
+            logging.error(i.strip('\n'))
+
         client.close()
+        return errors
 

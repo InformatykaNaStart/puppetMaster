@@ -15,7 +15,7 @@ A simple library for automatic managment of SIO2 workers in the Packet.com cloud
 (requires that `siomaster` resolves to `127.0.0.1`)
 
 ```
-sio2pm-spawndocker --verbose --hostName siomaster --paramFile {repoRoot}/configs/master-local informatykanastart/siomaster`
+sio2pm-spawndocker --verbose --hostName siomaster --paramFile {repoRoot}/configs/master-local informatykanastart/siomaster
 sio2pm-spawndocker --verbose --hostName siomaster --paramFile configs/worker-local -s MASTER_IP siomaster -s N 1 informatykanastart/sioworker
 ```
 
