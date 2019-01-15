@@ -23,12 +23,12 @@ sio2pm-spawndocker --verbose --hostName siomaster --paramFile {repoRoot}/configs
 
 * Run
   ```
-  sio2pm-spawndocker --hostName siomaster --verbose --paramFile configs/master mRmwURENyd2yW5KmuxVNCXfEscdVWmuw c3541c08-9b5b-47d7-b7ba-5498a614f267 informatykanastart/siomaster
+  sio2pm-spawndocker --hostName siomaster --verbose --paramFile configs/master --apiToken {PacketApiToken} --projectId {PacketProjectId} informatykanastart/siomaster
   ```
   and note down the IP of the master server reported in the displayed messages
 * Run
   ```
-  sio2pm-spawndocker --verbose --hostName sioworker --paramFile configs/worker -s MASTER_IP {ip} -s MEMORY_LIMIT 1G -s N_PARALLEL 4 mRmwURENyd2yW5KmuxVNCXfEscdVWmuw c3541c08-9b5b-47d7-b7ba-5498a614f267 informatykanastart/sioworker
+  sio2pm-spawndocker --verbose --hostName sioworker --paramFile configs/worker -s MASTER_IP {ip} -s MEMORY_LIMIT 1G -s N_PARALLEL 4 --apiToken {PacketApiToken} --projectId {PacketProjectId} informatykanastart/sioworker
   ```
-  subsituting the `{ip}` with the IP of the master node you noted down in the previous step.
+  subsituting the `{ip}` with the IP of the master node you noted down in the previous step and the `{PacketApiToken}` & `{PacketProjectId}` with your Packet credentials.
 
