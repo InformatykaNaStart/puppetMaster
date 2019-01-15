@@ -17,3 +17,12 @@ class Api:
         else:
             raise Exception('%d %s' % (resp.status_code, resp.reason))
 
+    def getPrices(self, facility, plan):
+        resp = self.call('GET', 'plans')
+        fullPrice = [i['pricing']['hour'] for i in resp['plans'] if i['slug'] == plan][0]
+
+        resp = self.call('GET', 'market/spot/prices')
+        curPrice = resp['spot_market_prices'][facility][plan]['price']
+
+        return (fullPrice, curPrice)
+

@@ -1,10 +1,12 @@
+import copy
 import logging
+import os
 import paramiko
 import time
 
 
 class Vm:
-    paramTmpl = {'facility': 'ams1', 'plan': 'baremetal_0', 'operating_system': 'ubuntu_18_04', 'spot_instance': True, 'spot_price_max': 0.07}
+    paramTmpl = {'facility': 'ams1', 'plan': 'baremetal_0', 'operating_system': 'ubuntu_18_04', 'spot_instance': True, 'spot_price_max': 0.02}
 
     api      = None
     id       = None
@@ -12,6 +14,8 @@ class Vm:
     ip       = None
     username = None
     log      = None
+    maxBid   = 0.02
+    bidOver  = 1
 
     def __init__(self, api=None):
         self.api = api
@@ -21,7 +25,26 @@ class Vm:
         self.id = id
         self.refreshStatus()
 
+    def setBid(self, maxBid, bidOver):
+        self.maxBid = maxBid
+        self.bidOver = 1 + bidOver if bidOver < 1 else bidOver
+
     def create(self, project, param, wait=True):
+        param = copy.copy(param)
+
+        fullPrice, curPrice = self.api.getPrices(param['facility'], param['plan'])
+
+        if min(curPrice, fullPrice) > self.maxBid:
+            raise Exception('prices to high: full %.2f market %.2f' % (fullPrice, curPrice))
+
+        if fullPrice <= curPrice:
+            param['spot_instance'] = False
+            logging.info('Paying full price %.2f' % fullPrice)
+        else:
+            param['spot_instance'] = True
+            param['spot_price_max'] = min(self.maxBid, curPrice * self.bidOver)
+            logging.info('Bidding at %.2f' % param['spot_price_max'])
+
         resp = self.api.call('POST', 'projects/' + project + '/devices', param)
         self.id = resp['id']
         self.status = resp
@@ -35,6 +58,7 @@ class Vm:
 
     def refreshStatus(self):
         self.status = self.api.call('GET', 'devices/' + self.id)
+        self.ip = self.getIp()
 
     def getIp(self):
         if self.ip is not None:
