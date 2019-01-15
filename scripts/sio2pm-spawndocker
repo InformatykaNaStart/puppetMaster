@@ -63,7 +63,7 @@ else:
     logging.info('Elapsed time %d s' % (datetime.datetime.now() - start).total_seconds())
     vm.installDocker()
 
-logging.info('The VM is ready (%s). Elapsed time %d. Running the docker container\n' % (vm.ip, (datetime.datetime.now() - start).total_seconds()))
+logging.info('The VM is ready (%s). Elapsed time %d s. Running the docker container\n' % (vm.ip, (datetime.datetime.now() - start).total_seconds()))
 vm.runDockerContainer(args.imageName, param, cmd, paramSubst)
 logging.info('Docker container run. Elapsed time %d s' % (datetime.datetime.now() - start).total_seconds())
 
