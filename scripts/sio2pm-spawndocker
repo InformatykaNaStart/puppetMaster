@@ -18,8 +18,12 @@ parser.add_argument('--paramFile', help='text file containing docker run paramet
 parser.add_argument('--paramStr', help='string containing all docker run parameters')
 parser.add_argument('--cmd', help='docker run cmd override')
 parser.add_argument('-s', '--substitute', nargs=2, action='append', default=[], help='values for placeholders in docker run parameters ')
-parser.add_argument('--maxBid', help='maximum bidding price', default=0.03, type=float)
+parser.add_argument('--bidMax', help='maximum bidding price', default=0.03, type=float)
 parser.add_argument('--bidOver', help='how much over the current market price to bid (e.g. 0.2 - bid 20% over)', default=0.1, type=float)
+parser.add_argument('--tunnelHost', help='tunnel all SIO2-related ports from a VM private IP to a given host')
+parser.add_argument('--tunnelUser', help='account name on the --tunnelHost host')
+parser.add_argument('--tunnelKey', help='RSA key used to authenticate while establishing a tunnel')
+parser.add_argument('--facility', help='Packet.com facility code', default='ams1')
 parser.add_argument('--apiToken')
 parser.add_argument('--projectId')
 parser.add_argument('imageName')
@@ -53,17 +57,21 @@ if args.apiToken is None or args.projectId is None:
     vm.username = getpass.getuser()
 else:
     vmParam = packet.vm.Vm.paramTmpl
+    vmParam['facility'] = args.facility
     if args.hostName is not None:
         vmParam['hostname'] = args.hostName
 
     api = packet.api.Api(args.apiToken)
     vm = packet.vm.Vm(api)
-    vm.setBid(args.maxBid, args.bidOver)
+    vm.setBid(args.bidMax, args.bidOver)
     vm.create(args.projectId, vmParam)
     logging.info('Elapsed time %d s' % (datetime.datetime.now() - start).total_seconds())
     vm.installDocker()
+    if args.tunnelHost is not None:
+        localIp = vm.createTunnel(args.tunnelHost, args.tunnelUser, args.tunnelKey, [80, 7888, 9999, 9877, 7890, 5672, 7899])
+        param += ' --add-host %s:%s' % (args.tunnelHost, localIp)
 
-logging.info('The VM is ready (%s). Elapsed time %d s. Running the docker container\n' % (vm.ip, (datetime.datetime.now() - start).total_seconds()))
+logging.info('The VM is ready (%s). Elapsed time %d s. Running the docker container\n' % (vm.getIp(), (datetime.datetime.now() - start).total_seconds()))
 vm.runDockerContainer(args.imageName, param, cmd, paramSubst)
 logging.info('Docker container run. Elapsed time %d s' % (datetime.datetime.now() - start).total_seconds())
 

@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 setup(
   name="sio2puppetMaster",
-  version="0.2",
+  version="0.3",
   packages=find_packages(),
   install_requires=[],
   scripts=['scripts/sio2pm-spawndocker'],

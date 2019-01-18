@@ -11,7 +11,6 @@ class Vm:
     api      = None
     id       = None
     status   = None
-    ip       = None
     username = None
     log      = None
     maxBid   = 0.02
@@ -42,7 +41,7 @@ class Vm:
             logging.info('Paying full price %.2f' % fullPrice)
         else:
             param['spot_instance'] = True
-            param['spot_price_max'] = min(self.maxBid, curPrice * self.bidOver)
+            param['spot_price_max'] = min(self.maxBid, round(curPrice * self.bidOver, 2))
             logging.info('Bidding at %.2f' % param['spot_price_max'])
 
         resp = self.api.call('POST', 'projects/' + project + '/devices', param)
@@ -58,42 +57,66 @@ class Vm:
 
     def refreshStatus(self):
         self.status = self.api.call('GET', 'devices/' + self.id)
-        self.ip = self.getIp()
 
-    def getIp(self):
-        if self.ip is not None:
-            return self.ip
-
+    def getIp(self, public = True):
         for i in self.status['ip_addresses']:
-            if i['address_family'] == 4 and i['public']:
-                self.ip = i['address']
-                return self.ip
+            if i['address_family'] == 4 and i['public'] == public:
+                return i['address']
 
     def installDocker(self):
         self.execCommand('export DEBIAN_FRONTEND=noninteractive && apt update && apt upgrade -y && apt install -y docker.io')
 
     def runDockerContainer(self, image, paramStr='', cmd='', substitute={}):
-        substitute['IP'] = self.ip
+        substitute['IP'] = self.getIp()
         for k, v in substitute.items():
             paramStr = paramStr.replace('{%s}' % k, v)
         command = 'docker run %s %s %s' % (paramStr, image, cmd)
         self.execCommand(command)
 
-    def execCommand(self, command):
-        client = paramiko.client.SSHClient()
-        client.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
-        logging.getLogger('paramiko').setLevel(logging.WARNING)
-        client.connect(self.ip, username=self.username)
+    def createTunnel(self, host, user, keyFile, ports):
+        locIp = self.getIp(False)
+        L = ' '.join(['-L %s:%d:127.0.0.1:%d' % (locIp, x, x) for x in ports])
+        
+        self.sendFile(keyFile, 'id_rsa')
+        self.execCommand('ssh -f -N -i id_rsa -o StrictHostKeyChecking=no %s %s@%s' % (L, user, host), True)
+        return locIp
+
+    def execCommand(self, command, noIO = False):
+        client = self.connect()
         logging.info(command + '\n')
-
         stdin, stdout, stderr = client.exec_command(command)
-        for i in stdout:
-            logging.info(i.strip('\n'))
-        errors = False
-        for i in stderr:
-            errors = True
-            logging.error(i.strip('\n'))
-
+        errors = None
+        if not noIO:
+            for i in stdout:
+                logging.info(i.strip('\n'))
+            errors = False
+            for i in stderr:
+                errors = True
+                logging.error(i.strip('\n'))
         client.close()
         return errors
 
+    def sendFile(self, localPath, remotePath):
+        client = self.connect()
+        sftp = client.open_sftp()
+        logging.info('uploading %s to %s' % (localPath, remotePath))
+        sftp.put(localPath, remotePath)
+        sftp.chmod(remotePath, os.stat(localPath)[0])
+        perm = os.stat(localPath)[0]
+        logging.info('  done')
+        
+    def getFile(self, remotePath, localPath):
+        client = self.connect()
+        sftp = client.open_sftp()
+        logging.info('downloading %s to %s' % (localPath, remotePath))
+        sftp.get(remotePath, localPath)
+        os.chmod(localPath, sftp.stat(remotePath).st_mode)
+        logging.info('  done')        
+    
+    def connect(self):
+        client = paramiko.client.SSHClient()
+        client.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
+        logging.getLogger('paramiko').setLevel(logging.WARNING)
+        client.connect(self.getIp(), username=self.username)
+        return client
+    
